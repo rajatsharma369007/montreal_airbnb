@@ -81,6 +81,7 @@ sns.barplot(data=grouped_list_df, x='zipcode', y='reviews_per_month')
 plt.xticks(rotation='vertical')
 plt.show()
 
+
 sub_list_df = list_df.loc[list_df['zipcode'].isin(grouped_list_df['zipcode'])]
 sub_list_df = sub_list_df.sort_values(by=['zipcode'])
 sns.boxplot(data=sub_list_df, x='zipcode', y='reviews_per_month')
@@ -96,3 +97,54 @@ grouped_list_df = grouped_list_df.sort_values(by=['zipcode'])
 sns.barplot(data=grouped_list_df, x='zipcode', y='host_is_superhost')
 plt.xticks(rotation='vertical')
 plt.show()
+
+###############################################################################
+
+list_df = pd.read_csv('./dataset/listings.csv')
+
+
+new_df = list_df[['id', 'name', 'description']]
+
+list_df['name'] = list_df['name'].astype('str')
+list_df['description'] = list_df['description'].astype('str')
+
+new_df.isnull().sum()
+
+
+new_df['content'] = new_df[['name', 'description']].astype(str).apply(lambda x: ' // '.join(x), axis = 1)
+
+new_df = new_df.drop(['name', 'description'], axis=1)
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+tf = TfidfVectorizer()
+tf_matrix = tf.fit_transform(new_df['content'])
+
+
+from sklearn.metrics.pairwise import linear_kernel
+cosine_similarities = linear_kernel(tf_matrix, tf_matrix)
+
+
+results = {}
+for idx, row in new_df.iterrows():
+    similar_indices = cosine_similarities[idx].argsort()[:-100:-1]
+    similar_items = [(cosine_similarities[idx][i], new_df['id'][i]) for i in similar_indices]
+    results[row['id']] = similar_items[1:]
+   
+ 
+def item(id):
+    name   = new_df.loc[new_df['id'] == id]['content'].tolist()[0].split(' // ')[0]
+    desc   = ' \nDescription: ' + new_df.loc[new_df['id'] == id]['content'].tolist()[0].split(' // ')[1][0:165] + '...'
+    prediction = name  + desc
+    return prediction
+
+def recommend(item_id, num):
+    print('Recommending ' + str(num) + ' products similar to ' + item(item_id))
+    print('---')
+    recs = results[item_id][:num]
+    for rec in recs:
+        print('\nRecommended: ' + item(rec[1]) + '\n(score:' + str(rec[0]) + ')')
+
+
+recommend(item_id = 29061, num = 5)
+
